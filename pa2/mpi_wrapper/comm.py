@@ -73,7 +73,7 @@ class Communicator(object):
           - For non-root processes: one send and one receive.
           - For the root process: (n-1) receives and (n-1) sends.
         """
-        #TODO: Your code here
+        #---------------- p2p --------------------
         if self.Get_rank() == 0:
             for i in range(1, self.Get_size()):
                 data = self.comm.recv(source=i, tag=11)
@@ -87,6 +87,8 @@ class Communicator(object):
         else:
             self.comm.send(src_array, dest=0, tag=11)
             dest_array[:] = self.comm.recv(source=0, tag=11)
+        #----------------- ring ---------------------
+
 
     def myAlltoall(self, src_array, dest_array):
         """
@@ -104,3 +106,20 @@ class Communicator(object):
         The total data transferred is updated for each pairwise exchange.
         """
         #TODO: Your code here
+        nprocs = self.Get_size()
+        rank = self.Get_rank()
+
+        # non-blocking send segment
+        for i in range(0, nprocs):
+            if i == rank:
+                # For the local segment, just copy the data
+                dest_array[rank] = src_array[rank]
+            else:
+                # For all other segments, use Sendrecv to exchange data
+                self.comm.isend(src_array[i], dest=i, tag=11)
+        # blocking recv
+        for i in range(0, nprocs):
+            if i == rank:
+                # nothing to do
+                continue
+            dest_array[i] = self.comm.recv(source=i, tag=11)
