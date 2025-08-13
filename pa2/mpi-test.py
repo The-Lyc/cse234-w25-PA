@@ -40,6 +40,7 @@ if __name__ == "__main__":
     if args.test_case == "myallreduce":
 
         num_runs = 100
+        len_array = 100
 
         # Lists to store the execution time for each run
         allreduce_times = []
@@ -50,10 +51,11 @@ if __name__ == "__main__":
 
         for run in range(num_runs):
             # Create a random integer array (each process gets its own random array)
-            r = np.random.randint(0, 100, 100)
+            r = np.random.randint(0, 100, len_array)
+
             # Arrays to store the reduction results
-            rr_allreduce   = np.empty(100, dtype=int)
-            rr_myallreduce = np.empty(100, dtype=int)
+            rr_allreduce   = np.empty(len_array, dtype=int)
+            rr_myallreduce = np.empty(len_array, dtype=int)
 
             # --- Built-in Allreduce Timing ---
             comm.Barrier()  # Synchronize all processes before timing

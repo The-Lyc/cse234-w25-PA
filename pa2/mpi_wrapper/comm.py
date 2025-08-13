@@ -74,6 +74,19 @@ class Communicator(object):
           - For the root process: (n-1) receives and (n-1) sends.
         """
         #TODO: Your code here
+        if self.Get_rank() == 0:
+            for i in range(1, self.Get_size()):
+                data = self.comm.recv(source=i, tag=11)
+                if op == MPI.SUM:
+                    src_array += data
+                elif op == MPI.MIN:
+                    src_array = np.minimum(src_array, data)
+            for i in range(1, self.Get_size()):
+                self.comm.send(src_array, dest=i, tag=11)
+            dest_array[:] = src_array
+        else:
+            self.comm.send(src_array, dest=0, tag=11)
+            dest_array[:] = self.comm.recv(source=0, tag=11)
 
     def myAlltoall(self, src_array, dest_array):
         """
