@@ -105,7 +105,6 @@ class Communicator(object):
             
         The total data transferred is updated for each pairwise exchange.
         """
-        #TODO: Your code here
         nprocs = self.Get_size()
         rank = self.Get_rank()
 
