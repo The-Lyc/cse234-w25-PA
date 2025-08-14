@@ -50,6 +50,22 @@ def get_info(
         The partitioned output dimension for the FC layer.
     """
     #TODO: Your code here
+    mp_idx = rank % mp_size
+    dp_idx = rank // mp_size
+    mp_comm = comm.Split(color=dp_idx, key=mp_idx)
+    dp_comm = comm.Split(color=mp_idx, key=dp_idx)
+
+    part_in_dim = in_dim
+    part_out_dim = out_dim
+
+    # W is of shape [in_dim, out_dim]
+    if fc_layer in ('fc_q', 'fc_k', 'fc_v'):
+        part_out_dim = out_dim // mp_size
+        part_in_dim = in_dim 
+    elif fc_layer == 'fc_o':
+        part_out_dim = out_dim
+        part_in_dim = in_dim // mp_size
+
     return mp_idx, dp_idx, mp_comm, dp_comm, part_in_dim, part_out_dim
 
 def naive_collect_forward_input(
@@ -65,7 +81,24 @@ def naive_collect_forward_input(
     After gathering, the full input should have shape:
       (batch_size, seq_length, part_in_dim * mp_size)
     """
-    #TODO: Your code here
+    stride_seq = x.shape[2]
+    stride_batch = x.shape[1] * stride_seq
+    stride_blk = x.shape[0] * stride_batch
+
+    collected_x = np.empty((x.shape[0], x.shape[1], x.shape[2] * mp_size))
+
+    x_flat = x.reshape(-1)
+    collected_x_flat = np.empty((stride_blk*mp_size))
+    mp_comm.Allgather(x_flat, collected_x_flat)
+    
+    
+    for blk in range(mp_size):
+        for batch in range(x.shape[0]):
+            for seq in range(x.shape[1]):
+                dim_3_start = blk * stride_seq
+                flat_start = blk*stride_blk + batch * stride_batch + seq * stride_seq
+                collected_x[batch, seq, dim_3_start: dim_3_start + stride_seq] = collected_x_flat[flat_start : flat_start+stride_seq]
+   
     return collected_x
 
 
@@ -82,7 +115,24 @@ def naive_collect_forward_output(
     After gathering, the full output should have shape:
       (batch_size, seq_length, part_out_dim * mp_size)
     """
-    #TODO: Your code here
+    stride_seq = out.shape[2]
+    stride_batch = out.shape[1] * stride_seq
+    stride_blk = out.shape[0] * stride_batch
+
+    collected_out = np.empty((out.shape[0], out.shape[1], out.shape[2] * mp_size))
+
+    out_flat = out.reshape(-1)
+    collected_out_flat = np.empty((out.shape[0]*out.shape[1]*out.shape[2]*mp_size))
+    mp_comm.Allgather(out_flat, collected_out_flat)
+
+
+    for blk in range(mp_size):
+        for batch in range(out.shape[0]):
+            for seq in range(out.shape[1]):
+                dim_3_start = blk * stride_seq
+                flat_start = blk*stride_blk + batch * stride_batch + seq * stride_seq
+                collected_out[batch, seq, dim_3_start : dim_3_start+stride_seq] = collected_out_flat[flat_start : flat_start+stride_seq] 
+
     return collected_out
 
 def naive_collect_backward_output(
