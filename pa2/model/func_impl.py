@@ -1,5 +1,6 @@
 import numpy as np
 from mpi4py import MPI
+import torch
 
 
 def get_info(
@@ -165,8 +166,9 @@ def naive_collect_backward_output(
         The local output gradient for this MP node with shape 
         (batch_size, seq_length, out_dim // mp_size).
     """
-    #TODO: Your code here
-
+    chunks = np.array_split(output_grad, mp_size, axis=2)
+    collected_output_grad = chunks[mp_group_idx]
+    return collected_output_grad
 
 def naive_collect_backward_x(
     grad_x: np.ndarray,
@@ -200,4 +202,10 @@ def naive_collect_backward_x(
         The reduced and scattered grad_x with shape 
         (batch_size, seq_length, in_dim // mp_size).
     """
-    #TODO: Your code here
+    batch_size = grad_x.shape[0]
+    collected_grad_x = np.empty((batch_size, grad_x.shape[1], grad_x.shape[2] // mp_size))
+    for batch in range(batch_size):
+        for seq in range(grad_x.shape[1]):
+            # Reduce-scatter along the last dimension (in_dim)
+            mp_comm.Reduce_scatter(grad_x[batch, seq, :], collected_grad_x[batch, seq, :], op=MPI.SUM)
+    return collected_grad_x
